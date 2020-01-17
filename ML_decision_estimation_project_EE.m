@@ -1,11 +1,11 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %Defining The parameters in the problem.
-actions = 16;
+targets = 16;
 M=10;
 N=40;
-max_num_of_targets = 6;
-num_of_targets_for_estimate_params = 4;
-%target is a value between 1 to 6 in this session - namely the number of
+max_num_of_trials = 6;
+num_of_trials_for_estimate_params = 4;
+%trial is a value between 1 to 6 in this session - namely the number of
 %experiments that were taken for each action. in order to have a test on
 %the estimator.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
