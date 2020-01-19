@@ -50,7 +50,7 @@ function accuracy = test(data, gaussians, M, N, num_targets, g_title)
         %we know every columon is a differnt target, and each target has
         %the same number of trials
         num_samples = length(data{1,i}(:,1)); 
-        min_samp = ceil(num_samples*0.75);
+        min_samp = floor(num_samples*0.75) + 1;
         for k = min_samp:num_samples
             for j = 1:M
                 sample(j,:) = data{j,i}(k,:);
