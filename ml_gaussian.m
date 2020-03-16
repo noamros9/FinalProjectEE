@@ -34,7 +34,21 @@ gaussians = create_gaussians(data, M, N, num_targets);
 accuracy = test(data, gaussians, M, N, num_targets, g_title);
 
 %The function disp desplays to the command window the choice
-disp(accuracy)
+vowels_idx = [1 8 9 15 16];
+vowels = {'a', 'e', 'i', 'o', 'u'};
+accuracy_vowels = accuracy(vowels_idx);
+
+figure
+h1 = plot([1 2 3 4 5], accuracy_vowels, 'o')
+xlim ([0 6])
+ylim([-0.1 1.2])
+set(h1, 'markerfacecolor', get(h1, 'color'))
+xticks([1 2 3 4 5])
+xticklabels({'a', 'e', 'i', 'o', 'u'})
+title("Accuracy per vowel")
+xlabel("vowel")
+ylabel("accuracy")
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %computes the accuracy of the ML algorithm by comparing the known
@@ -43,14 +57,15 @@ disp(accuracy)
 function accuracy = test(data, gaussians, M, N, num_targets, g_title)
     
     sample = zeros(M, N);
-    count_exps = 0;
-    count_correct = 0;
+    accuracy = zeros([1 16]);
     
     for i = 1:num_targets %num_targets
         %we know every columon is a differnt target, and each target has
         %the same number of trials
+        count_exps = 0;
+        count_correct = 0;
         num_samples = length(data{1,i}(:,1)); 
-        min_samp = floor(num_samples*0.75) + 1;
+        min_samp = ceil(num_samples*0.75);
         for k = min_samp:num_samples
             for j = 1:M
                 sample(j,:) = data{j,i}(k,:);
@@ -61,12 +76,10 @@ function accuracy = test(data, gaussians, M, N, num_targets, g_title)
             if(strcmp(choice, g_title{i,2})==1)
                 count_correct = count_correct + 1;
             end
-
         end
+        accuracy(i) = count_correct/count_exps;
     end
         
-accuracy = count_correct/count_exps;
-
 end
 
 
@@ -82,7 +95,7 @@ function choice = ML_G_IID(gaussians, sample, M, N, num_targets, g_title)
                 decision_values(alpha) = decision_values(alpha) + ...
                 log(gaussians{i, alpha, j}.sigma) + ...
                 ((sample(i, j) -  gaussians{i, alpha, j}.mu)^2)/...
-                (2 * (gaussians{i, alpha, j}.sigma^2));
+                (2 * gaussians{i, alpha, j}.sigma);
                 
             end
         end
@@ -102,7 +115,7 @@ function gaussians = create_gaussians(data, M, N, num_targets)
     for i = 1:M
         for j = 1:num_targets
             for k = 1:N
-                max_samp = floor(length(data{i,j}(:,k))*0.75);
+                max_samp = floor(length(data{i,j}(:,k)*0.75));
                 freqs = data{i, j}(1: max_samp, k);
                 gaussians(i,j,k) = {fitdist(freqs, 'Normal')};
             end
