@@ -18,16 +18,34 @@ data = merge_data(S1, S2, targets, num_of_targets);
 
 % M is the number of channels
 M = length(data(:,1));
-training_percent_from_data = 0.70;
+training_precent_from_data = 0.80;
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+training_samples_per_target = zeros(1,size(targets,2));
+samples_per_target = zeros(1,size(targets,2));
+for i=1:size(targets,2)
+    for neuron_num = 1:M
+        max_idx = ceil(length(data{neuron_num,i}(:,1))*training_precent_from_data);
+        if(training_samples_per_target(i)==0)
+            training_samples_per_target(i) = max_idx;
+            samples_per_target(i) = length(data{neuron_num,i}(:,1));
+        end
+        if(training_samples_per_target(i)>max_idx)
+            training_samples_per_target(i) = max_idx;
+            samples_per_target(i) = length(data{neuron_num,i}(:,1));
+        end
+    end
+end
+test_samples_per_target = samples_per_target - training_samples_per_target;
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %finding the significant neurons per vowel
-neurons = significant_neurons(data, M, num_of_targets,training_percent_from_data);
-%display(neurons);
+neurons = significant_neurons(data, M, num_of_targets,training_samples_per_target);
+display(neurons);
 
 %use neurons array to extract the group of siginificant neurons:
 %create data set to activate the SVM
-[data_set_X,data_set_class,data_set_test,data_class_test] = create_data_set_for_SVM(1,data,M,neurons,training_percent_from_data,targets);
+[data_set_X,data_set_class,data_set_test,data_class_test] = create_data_set_for_SVM(1,data,M,neurons,training_samples_per_target,samples_per_target,test_samples_per_target,targets);
 ecoc_model = fitcecoc(data_set_X,data_set_class);
 total_test_samples = size(data_set_test,1);
 successes = 0;
@@ -67,23 +85,23 @@ end
 %dimension will be "1" if the neuron has a significant response to the corresponding vowel and
 %"0" otherwise. The second dimension contains the average bin for a significant neuron
 
-function neurons=significant_neurons(data, M, num_of_targets,training_precent_from_data)
+function neurons=significant_neurons(data, M, num_of_targets,training_samples_per_target)
 	
 	neurons = zeros(M,num_of_targets,2);
 	
 	for i = 1:M
 		for j = 1:num_of_targets
 			%find the baseline vector of the relevant trials
-			baseline = baseline_vector(data, i, j, M,training_precent_from_data);
+			baseline = baseline_vector(data, i, j, M,training_samples_per_target);
 
 			%find the max bin, including its predecessor and follower
-			max_bins = find_max_bins(data, i, j, M,training_precent_from_data);
+			max_bins = find_max_bins(data, i, j, M,training_samples_per_target);
 
 			%check for significance. We use p = 0.05/3 since we 
 			%compare 3 different vectors to the baseline.
 			%we changed it to 0.05/10 for better results
             %we check only if there was a significant rise in the freq.
-            if(mean(baseline)*1.5 < mean(max_bins(1, :)))
+            if(mean(baseline)*1.5 < mean(max_bins(1, :)))%change for std
                 for k = 1:(length(max_bins(1,:))-1)
                     [h, p] = ttest2(baseline, max_bins(:, k));
                     if(p < 0.05/10)
@@ -102,11 +120,11 @@ end
 %this function return a baseline vector per neuron per trials
 %the baseline is defined as the average of the [-0.8,-0.3][s]
 
-function baseline=baseline_vector(data, i, j, M,training_precent_from_data)
+function baseline=baseline_vector(data, i, j, M,training_samples_per_target)
 	
 	%we take 80 percent of the trials as training set
-	max_trial = ceil(length(data{i,j}(:,1))*training_precent_from_data);
-	
+	%max_trial = ceil(length(data{i,j}(:,1))*training_precent_from_data);
+	max_trial = training_samples_per_target(j);
 	%create the baseline vector
 	baseline = zeros(max_trial,1);
 
@@ -122,11 +140,11 @@ end
 %each row (trial) will be: (max_bin, (max_bin+predecessor)/2, (max_bin+follower)/2)
 
 
-function max_bins=find_max_bins(data, i, j, M,training_precent_from_data)
+function max_bins=find_max_bins(data, i, j, M,training_samples_per_target)
 	
 	%we take 80 percent of the trials as training set 
-	max_trial = ceil(length(data{i,j}(:,1))*training_precent_from_data);
-	
+	%max_trial = ceil(length(data{i,j}(:,1))*training_precent_from_data);
+	max_trial = training_samples_per_target(j);
 	max_bins = zeros(max_trial, 4);
 	
 	for k = 1:max_trial
@@ -145,30 +163,17 @@ end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %This function creates the data set for the SVM estimator
-function [data_set_X,data_set_class,data_set_test,data_class_test] = create_data_set_for_SVM(mode,data,M,neurons,training_precent_from_data,targets)
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+function [data_set_X,data_set_class,data_set_test,data_class_test] = create_data_set_for_SVM(mode,data,M,neurons,...
+    training_samples_per_target,samples_per_target,test_samples_per_target,targets)
+
     neuron_index = 1:M;
     significant_neurons_group = neuron_index(sum(neurons(:,:,1),2)>0);
     significant_neurons_index = 1:size(significant_neurons_group,2);
     
-    
-    training_samples_per_target = zeros(1,size(targets,2));
-    samples_per_target = zeros(1,size(targets,2));
     N = size(data{1,1},2);
     
-    for i=1:size(targets,2)
-        for neuron_num = 1:M
-            max_idx = ceil(length(data{neuron_num,i}(:,1))*training_precent_from_data);
-            if(training_samples_per_target(i)==0)
-                training_samples_per_target(i) = max_idx;
-                samples_per_target(i) = length(data{neuron_num,i}(:,1));
-            end
-            if(training_samples_per_target(i)>max_idx)
-                training_samples_per_target(i) = max_idx;
-                samples_per_target(i) = length(data{neuron_num,i}(:,1));
-            end
-        end
-    end
-    test_samples_per_target = samples_per_target - training_samples_per_target;
     data_set_class = cell(sum(training_samples_per_target),1);
     data_class_test = cell(sum(test_samples_per_target),1);
     location = 0;
