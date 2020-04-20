@@ -57,7 +57,7 @@ neuron_to_check = [1,2];
 %use all samples to test the functions, 
 for neuron = neuron_to_check
     figure;
-    title_string = sprintf("Plot of samples for the %d'th neuron in the data set",neuron);
+    title_string = sprintf("Plot of samples for the %d'th neuron in the data set, 2\\sigma",neuron);
     suptitle(title_string);
     %each neuron will have a figure, containing num_of_targets rows(for
     %each target),each row will have two plots, one showing the results of.
@@ -71,7 +71,7 @@ for neuron = neuron_to_check
         %start subplot
         baselines_per_target = baseline_vector(data, neuron, target_idx, M,samples_per_target, trials_idx);
         mean_baselines = mean(baselines_per_target);
-        std_baselines =std(baselines_per_target); %NOTICE IF ONLY ONE SAMPLE IS GIVEN STD CAN RETURN BAD STUFF
+        std_baselines = std(baselines_per_target); %NOTICE IF ONLY ONE SAMPLE IS GIVEN STD CAN RETURN BAD STUFF
         %plot the information:
         plot([min(trials_idx),max(trials_idx)],[mean_baselines,mean_baselines],'-','Color','b');
         hold on;
@@ -79,9 +79,17 @@ for neuron = neuron_to_check
         plot([avg_idx,avg_idx],[mean_baselines - 2*std_baselines,mean_baselines + 2*std_baselines],...
             '-+b','MarkerFaceColor','b','MarkerSize',12);
         hold on;
+        plot([avg_idx,avg_idx],[mean_baselines + 2*std_baselines,mean_baselines + 2.25*std_baselines],...
+            "LineStyle","none")
+        hold on;
+        plot([avg_idx,avg_idx],[mean_baselines - 2*std_baselines,mean_baselines - 2.25*std_baselines],...
+            "LineStyle","none")
+        hold on;
         scatter(trials_idx,baselines_per_target,18,'b','filled');
         grid on;
         first_plot_title = sprintf("%s - baseline samples",targets(target_idx));
+        xlabel("tiral number")
+        ylabel("fr per hz");
         title(first_plot_title);
         %end subplot
         
@@ -100,14 +108,22 @@ for neuron = neuron_to_check
         plot([min(unique_info(:,1)),max(unique_info(:,1))],[mean_max_bins,mean_max_bins],'-','Color','r');
         hold on;
         average_idx = (min(unique_info(:,1)) + max(unique_info(:,1)))/2;
-        plot([average_idx,average_idx],[mean_max_bins-std_max_bins,mean_max_bins+std_max_bins],...
+        plot([average_idx,average_idx],[mean_max_bins-2*std_max_bins,mean_max_bins+2*std_max_bins],...
             '-+r','MarkerFaceColor','r','MarkerSize',12);
+        hold on;
+        plot([average_idx,average_idx],[mean_max_bins + 2*std_max_bins,mean_max_bins + 2.25*std_max_bins],...
+            "LineStyle","none")
+        hold on;
+        plot([average_idx,average_idx],[mean_max_bins - 2*std_max_bins,mean_max_bins - 2.25*std_max_bins],...
+            "LineStyle","none")
         hold on;
         scatter(unique_info(:,1),unique_info(:,2),18,counts_of_repititions_for_color,'filled');
         colormap(autumn(samples_per_target(target_idx)));
-        if(size(unique_info,1) ~= size(max_bins_info,1))%there are points thatrepeat in their values;
+        if(size(unique_info,1) ~= size(max_bins_info,1))%there are points that repeat in their values;
             colorbar;
         end
+        xlabel("bin number");
+        ylabel("fr per hz");
         grid on;
         %end subplot
         second_plot_title = sprintf("%s - active samples",targets(target_idx));
