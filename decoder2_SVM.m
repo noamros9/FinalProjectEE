@@ -3,6 +3,14 @@
 %information from different sessions.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%load parameters
+
+load('parameters.mat');
+
+display(algo);
+display(feature_selection);
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %defining the parameters of the algorithm
 
 S1 = load('speech_screening_analysis_beep_session1.mat');
@@ -19,6 +27,7 @@ data = merge_data(S1, S2, targets, num_of_targets);
 % M is the number of channels
 M = length(data(:,1));
 training_precent_from_data = 0.80;
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 training_samples_per_target = zeros(1,size(targets,2));
 samples_per_target = zeros(1,size(targets,2));
@@ -37,6 +46,7 @@ for i=1:size(targets,2)
 end
 test_samples_per_target = samples_per_target - training_samples_per_target;
 
+neurons = significant_neurons(data, M, num_of_targets,training_samples_per_target, [1,2,3,4,5], feature_selection, algo);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %cross validation. for now I write 6 as constans, could be changed to 
@@ -44,6 +54,10 @@ test_samples_per_target = samples_per_target - training_samples_per_target;
 
 indices = 1:6;
 
+successes = 0;
+total_test_samples = 0;
+
+%{
 for i=1:6
     %create the relevant indices
     train_idx = indices(indices~=i);
@@ -51,25 +65,25 @@ for i=1:6
     %finding the significant neurons per vowel
     neurons = significant_neurons(data, M, num_of_targets,training_samples_per_target, train_idx);
     %display(neurons);
-
+    
     %use neurons array to extract the group of siginificant neurons:
     %create data set to activate the SVM
     [data_set_X,data_set_class,data_set_test,data_class_test] = create_data_set_for_SVM(1,data,M,neurons,...
     training_samples_per_target,samples_per_target,test_samples_per_target,targets, train_idx, i);
     ecoc_model = fitcecoc(data_set_X,data_set_class);
-    total_test_samples = size(data_set_test,1);
-    successes = 0;
+    total_test_samples = total_test_samples + size(data_set_test,1);
     label_output_classifier = predict(ecoc_model,data_set_test); 
     for i = 1:size(data_set_test,1)
         if(label_output_classifier{i,1} == data_class_test{i,1})
             successes = successes + 1; 
         end
     end   
-    fprintf("The accuracy in for the model is: %.2f\n",successes/total_test_samples)
 
 end
 
 
+fprintf("The accuracy of the model is: %.2f\n",successes/total_test_samples);
+%}    
 
 
 
@@ -95,13 +109,16 @@ function data=merge_data(S1, S2, targets, num_of_targets)
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%this function will return a (N,5, 2) matrix, in which cell in the first
+%this function will return a (N,5, 3) matrix, in which cell in the first
 %dimension will be "1" if the neuron has a significant response to the corresponding vowel and
 %"0" otherwise. The second dimension contains the average bin for a significant neuron
+%the third layer will contain the needed info, according to the chosen algorithm
 
-function neurons=significant_neurons(data, M, num_of_targets,training_samples_per_target, train_idx)
+function neurons=significant_neurons(data, M, num_of_targets,training_samples_per_target, train_idx, feature_selection, algo)
 	
-	neurons = zeros(M,num_of_targets,2);
+	%create a cell and fill with 0's
+	neurons = cell(M,num_of_targets,3);
+	neurons(:,:,:) = {0};
 	
 	for i = 1:M
 		for j = 1:num_of_targets
@@ -123,8 +140,9 @@ function neurons=significant_neurons(data, M, num_of_targets,training_samples_pe
                 for k = 1:(length(max_bins(1,:))-1)
                     [h, p] = ttest2(baseline, max_bins(:, k));
                     if(p < 0.05/10)
-                        neurons(i, j, 1) = 1;
-                        neurons(i, j, 2) = mean(max_bins(:, 4));
+                        neurons(i, j, 1) = {1};
+                        neurons(i, j, 2) = {mean(max_bins(:, 4))};
+						neurons(i, j, 3) = {fill_info(feature_selection, algo, baseline, max_bins, k)};
                     end
                 end
             end
@@ -177,6 +195,46 @@ function max_bins=find_max_bins(data, i, j, M,training_samples_per_target, train
 	
 end
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%This info fills the third layer of neurons set in the relevant info
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+function val = fill_info(feature_selection, algo, baseline, max_bins, k)
+	
+	switch algo
+		case 'standard'
+			switch feature_selection
+				case 'max_bin'
+					val = [baseline max_bins(:,1)];
+				case 'sig_bin'
+					val = [baseline max_bins(:,k)];
+				case 'all_bin'
+					val = [baseline max_bins(:,1) max_bins( :,2) max_bins(:,3)];
+				
+			end
+		case 'diff'
+			switch feature_selection
+				case 'max_bin'
+					val = max_bins(:,1)-baseline;
+				case 'sig_bin'
+					val = max_bins(:,k)-baseline;
+				case 'all_bin'
+					val = [max_bins(:,k)-baseline max_bins(:,k)-baseline max_bins(:,k)-baseline];
+			end
+		case 'z_score'
+			baseline_dist = fitdist(baseline, 'Normal');
+			switch feature_selection
+				case 'max_bin'
+					val = (max_bins(:,1)-baseline_dist.mu)/baseline_dist.sigma;
+				case 'sig_bin'
+					val = (max_bins(:,k)-baseline_dist.mu)/baseline_dist.sigma;
+				case 'all_bin'
+					val = (max_bins(:,1:3)-baseline_dist.mu)/baseline_dist.sigma;
+			end
+	end
+
+end
+
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -215,6 +273,10 @@ function [data_set_X,data_set_class,data_set_test,data_class_test] = create_data
         location = location + training_samples_per_target(j);
         location_test = location_test + test_samples_per_target(j); 
         
+		
+		%TO-DO: Enter switch here. Based it on neurons 3rd layer 
+		%so you can replace the next 4 lines
+		%you can also get rid of modes
         for i = significant_neurons_group
             baseline_add = mean(data{i,j}(train_idx,13:17),2);
             max_bin_add = max(data{i,j}(train_idx,21:30),[],2);
