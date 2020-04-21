@@ -46,8 +46,6 @@ for i=1:size(targets,2)
 end
 test_samples_per_target = samples_per_target - training_samples_per_target;
 
-neurons = significant_neurons(data, M, num_of_targets,training_samples_per_target, [1,2,3,4,5], feature_selection, algo);
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %cross validation. for now I write 6 as constans, could be changed to 
 %parameter later
@@ -57,14 +55,13 @@ indices = 1:6;
 successes = 0;
 total_test_samples = 0;
 
-%{
+
 for i=1:6
     %create the relevant indices
     train_idx = indices(indices~=i);
     
     %finding the significant neurons per vowel
-    neurons = significant_neurons(data, M, num_of_targets,training_samples_per_target, train_idx);
-    %display(neurons);
+    neurons = significant_neurons(data, M, num_of_targets,training_samples_per_target, train_idx, feature_selection, algo);
     
     %use neurons array to extract the group of siginificant neurons:
     %create data set to activate the SVM
@@ -83,7 +80,7 @@ end
 
 
 fprintf("The accuracy of the model is: %.2f\n",successes/total_test_samples);
-%}    
+  
 
 
 
