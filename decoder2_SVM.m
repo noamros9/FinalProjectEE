@@ -57,6 +57,7 @@ total_test_samples = 0;
 
 
 for i=1:6
+    
     %create the relevant indices
     train_idx = indices(indices~=i);
     
@@ -65,23 +66,19 @@ for i=1:6
     
     %use neurons array to extract the group of siginificant neurons:
     %create data set to activate the SVM
-    [data_set_X,data_set_class,data_set_test,data_class_test] = create_data_set_for_SVM(1,data,M,neurons,...
+    [data_set_X,data_set_class,data_set_test,data_class_test] = create_data_set_for_SVM(algo,feature_selection,data,M,neurons,...
     training_samples_per_target,samples_per_target,test_samples_per_target,targets, train_idx, i);
     ecoc_model = fitcecoc(data_set_X,data_set_class);
-    total_test_samples = total_test_samples + size(data_set_test,1);
+    total_test_samples = size(data_set_test,1);
+    successes = 0;
     label_output_classifier = predict(ecoc_model,data_set_test); 
-    for i = 1:size(data_set_test,1)
-        if(label_output_classifier{i,1} == data_class_test{i,1})
+    for j = 1:size(data_set_test,1)%changed
+        if(label_output_classifier{j,1} == data_class_test{j,1})%changed
             successes = successes + 1; 
         end
     end   
-
+    fprintf("The accuracy of the model is: %.2f\n",successes/total_test_samples);
 end
-
-
-fprintf("The accuracy of the model is: %.2f\n",successes/total_test_samples);
-  
-
 
 
 
@@ -120,10 +117,10 @@ function neurons=significant_neurons(data, M, num_of_targets,training_samples_pe
 	for i = 1:M
 		for j = 1:num_of_targets
 			%find the baseline vector of the relevant trials
-			baseline = baseline_vector(data, i, j, M,training_samples_per_target, train_idx);
+			baseline = baseline_vector(data, i, j,training_samples_per_target, train_idx);
 
 			%find the max bin, including its predecessor and follower
-			max_bins = find_max_bins(data, i, j, M,training_samples_per_target, train_idx);
+			max_bins = find_max_bins(data, i, j,training_samples_per_target, train_idx);
 
 			%check for significance. We use p = 0.05/3 since we 
 			%compare 3 different vectors to the baseline.
@@ -132,14 +129,16 @@ function neurons=significant_neurons(data, M, num_of_targets,training_samples_pe
             %change for std
             
             baseline_dist = fitdist(baseline, 'Normal');
-          
+            P_min = 1;
             if(baseline_dist.mean + baseline_dist.sigma*2 < mean(max_bins(1, :)))
                 for k = 1:(length(max_bins(1,:))-1)
                     [h, p] = ttest2(baseline, max_bins(:, k));
-                    if(p < 0.05/10)
-                        neurons(i, j, 1) = {1};
-                        neurons(i, j, 2) = {mean(max_bins(:, 4))};
-						neurons(i, j, 3) = {fill_info(feature_selection, algo, baseline, max_bins, k)};
+                    if(p < P_min)%chnaged
+                        if(p < 0.05/10)
+                            neurons{i, j, 1} = 1;%chnaged
+                            neurons{i, j, 2} = mean(max_bins(:, 4));%changed
+                        end
+                        P_min = p;
                     end
                 end
             end
@@ -149,20 +148,132 @@ end
 
 
 
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%This function creates the data set for the SVM estimator
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+function [data_set_X,data_set_class,data_set_test,data_class_test] = create_data_set_for_SVM(algo,feature_selection,data,M,neurons,...
+    training_samples_per_target,samples_per_target,test_samples_per_target,targets, train_idx, test_idx)
+    
+    neuron_index = 1:M;
+    significant_table = cell2mat(neurons(:,:,1));
+    significant_neurons_group = neuron_index(sum(significant_table,2)>0);
+    
+    data_set_class = cell(sum(training_samples_per_target),1);
+    data_class_test = cell(sum(test_samples_per_target),1);
+    location = 0;
+    location_test = 0;
+    
+    for  j=1:size(targets,2)
+        %need to fill this loop
+        [data_set_X_chunk,data_set_test_chunk] = choose_numbers_for_chunk(train_idx,test_idx,j,data,neurons,training_samples_per_target...
+        ,significant_neurons_group,test_samples_per_target,algo,feature_selection);
+    
+        for k=1:training_samples_per_target(j)
+            data_set_class{location+k,1} = convertStringsToChars(targets(j));
+        end
+        for k=1:test_samples_per_target(j)
+            data_class_test{location_test+k,1} = convertStringsToChars(targets(j));
+        end
+        location = location + training_samples_per_target(j);
+        location_test = location_test + test_samples_per_target(j);
+        %Make the for loop to fill data set chunck
+  
+        if(j==1)
+            data_set_X = data_set_X_chunk;
+            data_set_test = data_set_test_chunk;
+        else
+            data_set_X = cat(1,data_set_X,data_set_X_chunk);
+            data_set_test = cat(1,data_set_test,data_set_test_chunk);
+        end
+    end
+end
+
+
+function [data_set_X_chunk,data_set_test_chunk] = choose_numbers_for_chunk(train_idx,test_idx,j,data,neurons,training_samples_per_target...
+    ,significant_neurons_group,test_samples_per_target,algo,feature_selection)
+    for i = significant_neurons_group
+        baseline_train = baseline_vector(data, i, j,training_samples_per_target, train_idx);
+        max_bins_train = find_max_bins(data, i, j,training_samples_per_target, train_idx);
+        max_bins_test = find_max_bins(data, i, j,test_samples_per_target, test_idx);
+        baseline_test = baseline_vector(data, i, j,test_samples_per_target, test_idx);
+        %create info_per_neuron_per_target
+        active_samples = cat(1,max_bins_train(:,3),max_bins_test(:,3));
+        baseline_samples = cat(1,baseline_train,baseline_test);
+        best_max_bins_with_test_sample = check_val_with_ttest(baseline_samples,active_samples);
+        train_size = size(max_bins_train,1);
+        switch algo
+            case 'standard'
+                switch feature_selection
+                    case 'max_bin'
+                        info_for_train = [baseline_train, max_bins_train(:,1)];
+                        info_for_test = [baseline_test, max_bins_test(:,1)];
+                    case 'sig_bin'
+                        info_for_train = [baseline_train, best_max_bins_with_test_sample(1:train_size)];
+                        info_for_test = [baseline_test, best_max_bins_with_test_sample(train_size +1 :end)];
+                    case 'all_bin'
+                        info_for_train = [baseline_train, max_bins_train(:,1), max_bins_train( :,2), max_bins_train(:,3)];
+                        info_for_test = [baseline_test, max_bins_test(:,1), max_bins_test( :,2), max_bins_test(:,3)];
+                        
+                end
+            case 'diff'
+                switch feature_selection
+                    case 'max_bin'
+                        info_for_train = max_bins_train(:,1) - baseline_train;
+                        info_for_test = max_bins_test(:,1)-baseline_test;
+                    case 'sig_bin'
+                        info_for_train = best_max_bins_with_test_sample(1:train_size) - baseline_train;
+                        info_for_test = best_max_bins_with_test_sample(train_size + 1:end) - baseline_test;
+                    case 'all_bin'
+                        info_for_train = [max_bins_train(:,1), max_bins_train( :,2), max_bins_train(:,3)] - baseline_train;
+                        info_for_test = [max_bins_test(:,1), max_bins_test( :,2), max_bins_test(:,3)] - baseline_test;
+                end
+            case 'z_score'
+                baseline_dist = fitdist(baseline_train, 'Normal');
+                switch feature_selection
+                    case 'max_bin'
+                        info_for_train = (max_bins_train(:,1) - baseline_dist.mu)/baseline_dist.sigma;
+                        info_for_test = (max_bins_test(:,1) - baseline_dist.mu)/baseline_dist.sigma;
+                    case 'sig_bin'
+                        info_for_train = (best_max_bins_with_test_sample(1:train_size) - baseline_dist.mu)/baseline_dist.sigma;
+                        info_for_test = (best_max_bins_with_test_sample(train_size+1:end) - baseline_dist.mu)/baseline_dist.sigma;
+                    case 'all_bin'
+                        info_for_train = (max_bins_train(:,1:3) - baseline_dist.mu)/baseline_dist.sigma;
+                        info_for_test = (max_bins_test(:,1:3) - baseline_dist.mu)/baseline_dist.sigma;
+                end      
+        end%end of switch algo
+        
+        if(i == significant_neurons_group(1))
+            data_set_X_chunk = info_for_train;%change - problem with saving in times of in significance
+            data_set_test_chunk = info_for_test;% fill information per neuron per target 
+        else
+            data_set_X_chunk = cat(2,data_set_X_chunk,info_for_train);
+            data_set_test_chunk = cat(2,data_set_test_chunk,info_for_test);
+        end
+        
+    end%end of for i = significant_neurons_group
+end 
+
+%need for these functions:
+
+
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %this function return a baseline vector per neuron per trials
 %the baseline is defined as the average of the [-0.8,-0.3][s]
 
-function baseline=baseline_vector(data, i, j, M,training_samples_per_target, train_idx)
+function baseline=baseline_vector(data, i, j,num_samples_per_target, cmpute_indexes)
 	
 	%we take 80 percent of the trials as training set
 	%max_trial = ceil(length(data{i,j}(:,1))*training_precent_from_data);
-	max_trial = training_samples_per_target(j);
+	max_trial = num_samples_per_target(j);
 	%create the baseline vector
 	baseline = zeros(max_trial,1);
 
 	for k = 1:max_trial
-		baseline(k) = mean(data{i,j}(train_idx(k), 13:17));
+		baseline(k) = mean(data{i,j}(cmpute_indexes(k), 13:17));
 	end
 	
 end
@@ -173,130 +284,41 @@ end
 %each row (trial) will be: (max_bin, (max_bin+predecessor)/2, (max_bin+follower)/2)
 
 
-function max_bins=find_max_bins(data, i, j, M,training_samples_per_target, train_idx)
+function max_bins=find_max_bins(data, i, j,num_samples_per_target, compute_indexes)
 	
 	%we take 80 percent of the trials as training set 
 	%max_trial = ceil(length(data{i,j}(:,1))*training_precent_from_data);
-	max_trial = training_samples_per_target(j);
+	max_trial = num_samples_per_target(j);
 	max_bins = zeros(max_trial, 4);
 	
 	for k = 1:max_trial
-		[max_bin_val, max_bin_idx] = max(data{i,j}(train_idx(k), 21:30));
+		[max_bin_val, max_bin_idx] = max(data{i,j}(compute_indexes(k), 21:30));
 		max_bins(k, 1) = max_bin_val;
         %notice that the max_bin_idx is relative to the specified array, so
         %we add 20 as offset
-		max_bins(k, 2) = (max_bin_val + data{i,j}(train_idx(k), max_bin_idx + 21))/2;
-		max_bins(k, 3) = (max_bin_val + data{i,j}(train_idx(k), max_bin_idx + 19))/2;
+		max_bins(k, 2) = (max_bin_val + data{i,j}(compute_indexes(k), max_bin_idx + 21))/2;
+		max_bins(k, 3) = (max_bin_val + data{i,j}(compute_indexes(k), max_bin_idx + 19))/2;
 		max_bins(k, 4) = max_bin_idx;
 	end
 	
 end
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%This info fills the third layer of neurons set in the relevant info
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-function val = fill_info(feature_selection, algo, baseline, max_bins, k)
-	
-	switch algo
-		case 'standard'
-			switch feature_selection
-				case 'max_bin'
-					val = [baseline max_bins(:,1)];
-				case 'sig_bin'
-					val = [baseline max_bins(:,k)];
-				case 'all_bin'
-					val = [baseline max_bins(:,1) max_bins( :,2) max_bins(:,3)];
-				
-			end
-		case 'diff'
-			switch feature_selection
-				case 'max_bin'
-					val = max_bins(:,1)-baseline;
-				case 'sig_bin'
-					val = max_bins(:,k)-baseline;
-				case 'all_bin'
-					val = [max_bins(:,k)-baseline max_bins(:,k)-baseline max_bins(:,k)-baseline];
-			end
-		case 'z_score'
-			baseline_dist = fitdist(baseline, 'Normal');
-			switch feature_selection
-				case 'max_bin'
-					val = (max_bins(:,1)-baseline_dist.mu)/baseline_dist.sigma;
-				case 'sig_bin'
-					val = (max_bins(:,k)-baseline_dist.mu)/baseline_dist.sigma;
-				case 'all_bin'
-					val = (max_bins(:,1:3)-baseline_dist.mu)/baseline_dist.sigma;
-			end
-	end
-
-end
-
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%This function creates the data set for the SVM estimator
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-function [data_set_X,data_set_class,data_set_test,data_class_test] = create_data_set_for_SVM(mode,data,M,neurons,...
-    training_samples_per_target,samples_per_target,test_samples_per_target,targets, train_idx, test_idx)
-
-    neuron_index = 1:M;
-    significant_neurons_group = neuron_index(sum(neurons(:,:,1),2)>0);
-    significant_neurons_index = 1:size(significant_neurons_group,2);
-    
-    N = size(data{1,1},2);
-    
-    data_set_class = cell(sum(training_samples_per_target),1);
-    data_class_test = cell(sum(test_samples_per_target),1);
-    location = 0;
-    location_test = 0;
-    for  j=1:size(targets,2)
-        if(mode==1)
-            data_set_X_chunk  = zeros(training_samples_per_target(j),2*size(significant_neurons_group,2));
-            data_set_test_chunk = zeros(test_samples_per_target(j),2*size(significant_neurons_group,2));
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%This function recive a column of baseline samples a matrix 
+%that has columns of active samples(each column is for different sample)
+%The function returns the column with the samllest p-value from all the
+%columns
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function significant_column = check_val_with_ttest(baseline,active_samples)
+    active_columns_num = size(active_samples,2);
+    P_min = 1;
+    min_p_value_idx = 0;
+    for i=1:active_columns_num
+        [h, p] = ttest2(baseline, active_samples(:,i));
+        if(p < P_min)%chnaged
+            P_min = p;
+            min_p_value_idx = i;
         end
-        if (mode==2)
-            data_set_X_chunk = zeros(training_samples_per_target(j),size(significant_neurons_group,2));
-            data_set_test_chunk = zeros(test_samples_per_target(j),size(significant_neurons_group,2));
-        end
-        
-        for k=1:training_samples_per_target(j)
-            data_set_class{location+k,1} = convertStringsToChars(targets(j));
-        end
-        for k=1:test_samples_per_target(j)
-            data_class_test{location_test+k,1} = convertStringsToChars(targets(j));
-        end
-        location = location + training_samples_per_target(j);
-        location_test = location_test + test_samples_per_target(j); 
-        
-		
-		%TO-DO: Enter switch here. Based it on neurons 3rd layer 
-		%so you can replace the next 4 lines
-		%you can also get rid of modes
-        for i = significant_neurons_group
-            baseline_add = mean(data{i,j}(train_idx,13:17),2);
-            max_bin_add = max(data{i,j}(train_idx,21:30),[],2);
-            baseline_add_test = mean(data{i,j}(test_idx,13:17),2);
-            max_bin_add_test = max(data{i,j}(test_idx,21:30),[],2);
-            %doesnt support reaction location
-            if(mode==1)
-                data_set_X_chunk(:,significant_neurons_index(i == significant_neurons_group)*2 - 1)  = baseline_add;
-                data_set_X_chunk(:,significant_neurons_index(i == significant_neurons_group)*2) = max_bin_add;
-                data_set_test_chunk(:,significant_neurons_index(i == significant_neurons_group)*2 - 1)  = baseline_add_test;
-                data_set_test_chunk(:,significant_neurons_index(i == significant_neurons_group)*2) = max_bin_add_test;
-            end
-            if (mode==2)
-                data_set_X_chunk(:,significant_neurons_index(i == significant_neurons_group)) = max_bin_add - baseline_add;
-                data_set_test_chunk(:,significant_neurons_index(i == significant_neurons_group)) = max_bin_add_test - baseline_add_test;
-            end
-        end
-        if(j==1)
-            data_set_X = data_set_X_chunk;
-            data_set_test = data_set_test_chunk;
-        else
-            data_set_X = cat(1,data_set_X,data_set_X_chunk);
-            data_set_test = cat(1,data_set_test,data_set_test_chunk);
-        end
-    end 
+    end
+    significant_column = active_samples(:,min_p_value_idx);
 end
