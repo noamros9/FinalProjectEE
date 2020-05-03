@@ -7,7 +7,6 @@
 
 load('parameters.mat');
 
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %defining the parameters of the algorithm
 
@@ -53,36 +52,58 @@ indices = 1:6;
 successes = 0;
 accuracy_per_trial_choosen = zeros(6,1);
 
+max_accuracy = 0;
+max_accuracy_std = 0;
 
-for i=1:6
-	
-	%create the relevant indices
-	train_idx = indices(indices~=i);
-	
-	%finding the significant neurons per vowel
-	neurons = significant_neurons(data, M, num_of_targets,training_samples_per_target, train_idx,...
-	feature_selection, algo, p_value_threshold, start_bin, end_bin);
-	
-	%use neurons array to extract the group of siginificant neurons:
-	%create data set to activate the SVM
-	[data_set_X,data_set_class,data_set_test,data_class_test] = create_data_set_for_SVM(algo,feature_selection,data,M,neurons,...
-	training_samples_per_target,samples_per_target,test_samples_per_target,targets, train_idx, i, start_bin, end_bin);
-	ecoc_model = fitcecoc(data_set_X,data_set_class);
-	total_test_samples = size(data_set_test,1);
-	successes = 0;
-	label_output_classifier = predict(ecoc_model,data_set_test); 
-	for j = 1:size(data_set_test,1)%changed
-		if(label_output_classifier{j,1} == data_class_test{j,1})%changed
-			successes = successes + 1; 
+for start_bin = 11:18
+	for end_bin = start_bin+2:20
+		
+	fprintf("Current bins: %d-%d\n", start_bin, end_bin);
+
+		for i=1:6
+			
+			%create the relevant indices
+			train_idx = indices(indices~=i);
+			
+			%finding the significant neurons per vowel
+			neurons = significant_neurons(data, M, num_of_targets,training_samples_per_target, train_idx,...
+			feature_selection, algo, p_value_threshold, start_bin, end_bin);
+			
+			%use neurons array to extract the group of siginificant neurons:
+			%create data set to activate the SVM
+			[data_set_X,data_set_class,data_set_test,data_class_test] = create_data_set_for_SVM(algo,feature_selection,data,M,neurons,...
+			training_samples_per_target,samples_per_target,test_samples_per_target,targets, train_idx, i, start_bin, end_bin);
+			ecoc_model = fitcecoc(data_set_X,data_set_class);
+			total_test_samples = size(data_set_test,1);
+			successes = 0;
+			label_output_classifier = predict(ecoc_model,data_set_test); 
+			for j = 1:size(data_set_test,1)%changed
+				if(label_output_classifier{j,1} == data_class_test{j,1})%changed
+					successes = successes + 1; 
+				end
+			end 
+			accuracy_per_trial_choosen(i) = successes/total_test_samples;
 		end
-	end 
-	accuracy_per_trial_choosen(i) = successes/total_test_samples;
+
+		algo_accuracy_dist = fitdist(accuracy_per_trial_choosen, 'Normal');
+		fprintf("The accuracy of the model is: %.2f\n", algo_accuracy_dist.mean);
+		fprintf("The std is %.2f\n", algo_accuracy_dist.sigma);
+		
+		if algo_accuracy_dist.mean >= max_accuracy
+			max_accuracy = algo_accuracy_dist.mean;
+			if algo_accuracy_dist.sigma <= max_accuracy_std || max_accuracy_std == 0
+				max_accuracy_std = algo_accuracy_dist.sigma;
+				opt_start_bin = start_bin;
+				opt_end_bin = end_bin;
+			end
+		end
+		
+	end
 end
 
-algo_accuracy_dist = fitdist(accuracy_per_trial_choosen, 'Normal');
-fprintf("The accuracy of the model is: %.2f\n", algo_accuracy_dist.mean);
-fprintf("The std is %.2f\n", algo_accuracy_dist.sigma);
-
+fprintf("The maximum accuracy achieved is %.2f\n", max_accuracy);
+fprintf("The maximum accrracy std achieved is %.2f\n", max_accuracy_std);
+fprintf("Optimal bins: %d-%d\n", opt_start_bin, opt_end_bin);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %this function will merge data from multiple sessions (at the moment-2)

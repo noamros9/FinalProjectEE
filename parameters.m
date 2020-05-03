@@ -22,5 +22,47 @@ feature_selection = 'all_bin';
 
 algo = 'z_score';
 
+switch algo
+	case 'standard'
+		switch feature_selection
+			case 'max_bin'
+				p_value_threshold = 0.05/4;
+				start_bin = 11;
+				end_bin = 16;
+			case 'sig_bin'
+				p_value_threshold = 0.05/4;
+			case 'all_bin'
+				p_value_threshold = 0.05/3;
+				start_bin = 13;
+				end_bin = 16;
+		end
+	case 'diff'
+		switch feature_selection
+			case 'max_bin'
+				p_value_threshold = 0.05/25;
+				start_bin = 11;
+				end_bin = 19;
+			case 'sig_bin'
+				p_value_threshold = 0.05/4;
+			case 'all_bin'
+				p_value_threshold = 0.05/3;
+				start_bin = 11;
+				end_bin = 20;
+		end
+	case 'z_score'
+		switch feature_selection
+			case 'max_bin'
+				p_value_threshold = 0.05/13;
+				start_bin = 18;
+				end_bin = 20;
+			case 'sig_bin'
+				p_value_threshold = 0.05/4;
+			case 'all_bin'
+				p_value_threshold = 0.05/3;
+				start_bin = 16;
+				end_bin = 20;
+		end      
+end
+
 save parameters.mat;
 
