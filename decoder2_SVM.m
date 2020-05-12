@@ -13,12 +13,16 @@ load('parameters.mat');
 
 S1 = load('speech_screening_analysis_beep_session1.mat');
 S2 = load('speech_screening_analysis_beep_session2.mat');
-
+S3 = load('speech_screening_analysis_beep_session3.mat');
 %for now, we handle vowels only
 targets = ["a","e","i","o","u"];
 num_of_targets = size(targets,2);
-
-
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%example of use of the new merge data function.
+%data_Structs = {S1,S2,S3};
+%beep_start = [1,1,1];
+%data = merge_data_from_cell(data_Structs,beep_start, targets, num_of_targets);
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %creating a struct with all the information of the two ssestions file
 data = merge_data(S1, S2, targets, num_of_targets);
 
@@ -86,30 +90,34 @@ fprintf("The std is %.2f\n", algo_accuracy_dist.sigma);
 
 
 
-
-function data = merge_data_from_cell(data_Structs, targets, num_of_targets)
+function data = merge_data_from_cell(data_Structs,beep_start, targets, num_of_targets)
     data_set_size = size(data_Structs,2);
     data_devided = cell(1,data_set_size);
     data_neurons_num = 0;
     for i=1:data_set_size
         full_data_per_S = data_Structs{1,i}.sct.fr_hz_per_trial_per_cl_per_target;
         g_title_per_S = data_Structs{1,i}.g_title;
-        data_per_S = full_data_per_S( :,sum(g_title_per_S(:,2)==targets,2)==1 );
+        if(beep_start(i) == 1)
+            data_per_S = full_data_per_S( :,sum(g_title_per_S(:,2)==targets,2)==1 );
+        else
+            data_per_S = full_data_per_S( :,sum(g_title_per_S(:,2)==("beep_" + targets),2)==1 );
+        end
         data_neurons_num = data_neurons_num + size(data_per_S,1);
         data_devided{1,i} = data_per_S;
     end
-    data = cell(data_devided,num_of_targets);
+    data = cell(data_neurons_num,num_of_targets);
     offset = 0;
     for i = 1:data_set_size
         if(i==1)
-            data(1:size(data_devided{1,i},1)) = data_devided{1,i};
+            data(1:size(data_devided{1,i},1),:) = data_devided{1,i};
             offset = size(data_devided{1,i},1);
         else
-            data((offset+1):(offset + size(data_devided{1,i},1))) = data_devided{1,i};
-            offset = offset + size(data_devided{1,i};
+            data((offset+1):(offset + size(data_devided{1,i},1)),:) = data_devided{1,i};
+            offset = offset + size(data_devided{1,i});
         end
     end
 end
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %this function will merge data from multiple sessions (at the moment-2)
