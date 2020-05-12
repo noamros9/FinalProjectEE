@@ -10,7 +10,7 @@ load('parameters.mat');
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %defining the parameters of the algorithm
-
+%{
 S1 = load('speech_screening_analysis_beep_session1.mat');
 S2 = load('speech_screening_analysis_beep_session2.mat');
 S3 = load('speech_screening_analysis_beep_session3.mat');
@@ -20,16 +20,13 @@ S6 = load('speech_screening_analysis_session6.mat');
 S7 = load('speech_screening_analysis_session7.mat'); 
 S8 = load('speech_screening_analysis_session8.mat'); 
 S9 = load('speech_screening_analysis_session9.mat'); 
-
+%}
 %for now, we handle vowels only
 targets = ["a","e","i","o","u"];
 num_of_targets = size(targets,2);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %example of use of the new merge data function.
-data_Structs = {S1,S2,S3,S4,S5,S6,S7,S8,S9};
-beep_start = [1,1,1,0,0,0,0,0,0];
-data = merge_data_from_cell(data_Structs,beep_start, targets, num_of_targets);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %creating a struct with all the information of the two ssestions file
@@ -65,42 +62,53 @@ test_samples_per_target = [1,1,1,1,1];
 %cross validation. for now I write 6 as constans, could be changed to 
 %parameter later
 
-indices = 1:6;
-
-successes = 0;
-accuracy_per_trial_choosen = zeros(6,1);
+data_Structs = {S1,S2,S3,S4,S5,S6,S7,S8,S9};
+beep_start = [1,1,1,0,0,0,0,0,0];
 
 
-for i=1:6
+for j = 1:9
 	
-	%create the relevant indices
-	train_idx = indices(indices~=i);
+	data_struct_single_session = {data_Structs{j}};
+	beep_start_single_session = beep_start(j);
+	data = merge_data_from_cell(data_struct_single_session,beep_start_single_session, targets, num_of_targets);
+
 	
-	%finding the significant neurons per vowel
-	neurons = significant_neurons(data, M, num_of_targets,training_samples_per_target, train_idx,...
-	feature_selection, algo, p_value_threshold, start_bin, end_bin);
-	
-	%use neurons array to extract the group of siginificant neurons:
-	%create data set to activate the SVM
-	[data_set_X,data_set_class,data_set_test,data_class_test] = create_data_set_for_SVM(algo,feature_selection,data,M,neurons,...
-	training_samples_per_target,samples_per_target,test_samples_per_target,targets, train_idx, i, start_bin, end_bin);
-	ecoc_model = fitcecoc(data_set_X,data_set_class);
-	total_test_samples = size(data_set_test,1);
+	indices = 1:6;
+
 	successes = 0;
-	label_output_classifier = predict(ecoc_model,data_set_test); 
-	for j = 1:size(data_set_test,1)%changed
-		if(label_output_classifier{j,1} == data_class_test{j,1})%changed
-			successes = successes + 1; 
-		end
-	end 
-	accuracy_per_trial_choosen(i) = successes/total_test_samples;
+	accuracy_per_trial_choosen = zeros(6,1);
+
+
+	for i=1:6
+		
+		%create the relevant indices
+		train_idx = indices(indices~=i);
+		
+		%finding the significant neurons per vowel
+		neurons = significant_neurons(data, M, num_of_targets,training_samples_per_target, train_idx,...
+		feature_selection, algo, p_value_threshold, start_bin, end_bin);
+		
+		%use neurons array to extract the group of siginificant neurons:
+		%create data set to activate the SVM
+		[data_set_X,data_set_class,data_set_test,data_class_test] = create_data_set_for_SVM(algo,feature_selection,data,M,neurons,...
+		training_samples_per_target,samples_per_target,test_samples_per_target,targets, train_idx, i, start_bin, end_bin);
+		ecoc_model = fitcecoc(data_set_X,data_set_class);
+		total_test_samples = size(data_set_test,1);
+		successes = 0;
+		label_output_classifier = predict(ecoc_model,data_set_test); 
+		for j = 1:size(data_set_test,1)%changed
+			if(label_output_classifier{j,1} == data_class_test{j,1})%changed
+				successes = successes + 1; 
+			end
+		end 
+		accuracy_per_trial_choosen(i) = successes/total_test_samples;
+	end
+
+	algo_accuracy_dist = fitdist(accuracy_per_trial_choosen, 'Normal');
+	fprintf("The accuracy of the model is: %.2f\n", algo_accuracy_dist.mean);
+	fprintf("The std is %.2f\n", algo_accuracy_dist.sigma);
+
 end
-
-algo_accuracy_dist = fitdist(accuracy_per_trial_choosen, 'Normal');
-fprintf("The accuracy of the model is: %.2f\n", algo_accuracy_dist.mean);
-fprintf("The std is %.2f\n", algo_accuracy_dist.sigma);
-
-
 
 
 function data = merge_data_from_cell(data_Structs,beep_start, targets, num_of_targets)
