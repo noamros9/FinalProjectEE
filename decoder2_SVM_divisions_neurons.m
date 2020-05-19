@@ -10,7 +10,7 @@ load('parameters.mat');
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %defining the parameters of the algorithm
 
-%{
+
 S1 = load('speech_screening_analysis_beep_session1.mat');
 S2 = load('speech_screening_analysis_beep_session2.mat');
 S3 = load('speech_screening_analysis_beep_session3.mat');
@@ -20,7 +20,7 @@ S6 = load('speech_screening_analysis_session6.mat');
 S7 = load('speech_screening_analysis_session7.mat'); 
 S8 = load('speech_screening_analysis_session8.mat'); 
 S9 = load('speech_screening_analysis_session9.mat'); 
-%}
+
 
 %for now, we handle vowels only
 targets = ["a","e","i","o","u"];
