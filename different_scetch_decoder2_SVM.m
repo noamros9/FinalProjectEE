@@ -108,7 +108,7 @@ function set_as_rows = create_data_for_SVM(set,neurons,algo,feature_selection, s
 end
 function  neurons = significant_neurons(training_set_per_target,M,start_bin,end_bin,p_value_threshold)
     %create a cell and fill with 0's
-    num_of_targets = size(training_set_per_target,2);
+    num_of_targets = size(training_set_per_target,1);
 	neurons = cell(M,num_of_targets,3);
 	neurons(:,:,:) = {0};
     for j = 1:num_of_targets
