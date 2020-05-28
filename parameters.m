@@ -19,18 +19,21 @@ feature_selection = 'max_bin';
 % the bin(s) chosen. It leads to one less feature
 % 3.z_score - we pass the zscore of the bin(s), in relation
 % to the baseline
+% 4.pca
 
-algo = 'standard';
+algo = 'pca';
 
 p_value_threshold = 0.05/3;
+
+%pca paramters - which bins to check and how many principal components to take into consideration
+pca_bins = 11:30;
+num_pca_components = 20;
+
 
 switch algo
 	case 'standard'
 		switch feature_selection
 			case 'max_bin'
-				start_bin = 13;
-				end_bin = 17;
-			case 'pca'
 				start_bin = 13;
 				end_bin = 17;
 			case 'max_bin_prev_pred'
@@ -42,9 +45,6 @@ switch algo
 			case 'max_bin'
 				start_bin = 13;
 				end_bin = 15;
-			case 'pca'
-				start_bin = 13;
-				end_bin = 17;
 			case 'max_bin_prev_pred'
 				start_bin = 16;
 				end_bin = 20;
@@ -54,13 +54,13 @@ switch algo
 			case 'max_bin'
 				start_bin = 18;
 				end_bin = 20;
-			case 'pca'
-				start_bin = 13;
-				end_bin = 17;
 			case 'max_bin_prev_pred'
 				start_bin = 16;
 				end_bin = 20;
-		end      
+		end   
+	case 'pca'
+		start_bin = 13;
+		end_bin = 17;
 end
 
 save parameters.mat;

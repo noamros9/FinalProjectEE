@@ -19,8 +19,9 @@ S5 = load('speech_screening_analysis_beep_session8.mat');
 S6 = load('speech_screening_analysis_session6.mat'); 
 S7 = load('speech_screening_analysis_session7.mat'); 
 S8 = load('speech_screening_analysis_session8.mat'); 
-S9 = load('speech_screening_analysis_session9.mat'); 
 %}
+S9 = load('speech_screening_analysis_session9.mat'); 
+
 
 %for now, we handle vowels only
 targets = ["a","e","i","o","u"];
@@ -66,41 +67,47 @@ all_possible_tests_sets = number_of_test_sets(samples_per_target,test_samples_pe
 successes = 0;
 accuracy_per_trial_choosen = zeros(number_of_CV,1);
 
-for possible= 1:number_of_CV
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    %NOTICE The next function ASSUMES that all the bins are of constant
-    %size - if not valid errors can occur
-    data_set_per_target = create_data_set_per_target(data,samples_per_target,M);%cell, in every place the trails in matrix form
-    %indexes_as_test = choose_indexes(num_of_targets,all_possible_tests_sets);
-    indexes_as_test = cell(num_of_targets,1);
-    indexes_as_test(:,:) = {possible};
-    [training_set_per_target,test_set_per_target] = arrange_data_set(data_set_per_target,indexes_as_test);
-    [training_set,training_labels] = create_set_samples(training_set_per_target,targets,training_samples_per_target);
-    [mean_baseline_per_neuron,std_baseline_per_neuron] = create_total_mean_baseline(training_set,start_bin,end_bin);
-    [test_set,test_labels] = create_set_samples(test_set_per_target,targets,test_samples_per_target);
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    neurons = significant_neurons(training_set_per_target,M,start_bin,end_bin,p_value_threshold);
-	[pca_coeff,score,latent,tsquared,explained,mu] = generate_pca_coeffs(training_set, M, neurons, pca_bins);
-    training_set_as_rows = create_data_for_SVM(training_set,neurons,algo,feature_selection, start_bin, end_bin,mean_baseline_per_neuron,std_baseline_per_neuron, pca_bins, pca_coeff, num_pca_components);
-    test_set_as_rows = create_data_for_SVM(test_set,neurons,algo,feature_selection, start_bin, end_bin,mean_baseline_per_neuron,std_baseline_per_neuron, pca_bins, pca_coeff, num_pca_components);
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    
-    ecoc_model = fitcecoc(training_set_as_rows,training_labels);
-	total_test_samples = size(test_set_as_rows,1);
-	successes = 0;
-	label_output_classifier = predict(ecoc_model,test_set_as_rows); 
-    for j = 1:size(test_set_as_rows,1)%changed
-        if(label_output_classifier{j,1} == test_labels{j,1})%changed
-            successes = successes + 1;
-        end
-    end
-    accuracy_per_trial_choosen(possible) = successes/total_test_samples;
+accuracy_per__pca_components_taken = zeros(num_pca_components, 2);
+
+for PCA_comp = 1:num_pca_components
+	for possible= 1:number_of_CV
+		%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		%NOTICE The next function ASSUMES that all the bins are of constant
+		%size - if not valid errors can occur
+		data_set_per_target = create_data_set_per_target(data,samples_per_target,M);%cell, in every place the trails in matrix form
+		%indexes_as_test = choose_indexes(num_of_targets,all_possible_tests_sets);
+		indexes_as_test = cell(num_of_targets,1);
+		indexes_as_test(:,:) = {possible};
+		[training_set_per_target,test_set_per_target] = arrange_data_set(data_set_per_target,indexes_as_test);
+		[training_set,training_labels] = create_set_samples(training_set_per_target,targets,training_samples_per_target);
+		[mean_baseline_per_neuron,std_baseline_per_neuron] = create_total_mean_baseline(training_set,start_bin,end_bin);
+		[test_set,test_labels] = create_set_samples(test_set_per_target,targets,test_samples_per_target);
+		%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		neurons = significant_neurons(training_set_per_target,M,start_bin,end_bin,p_value_threshold);
+		[pca_coeff,score,latent,tsquared,explained,mu] = generate_pca_coeffs(training_set, M, neurons, pca_bins);
+		training_set_as_rows = create_data_for_SVM(training_set,neurons,algo,feature_selection, start_bin, end_bin,mean_baseline_per_neuron,std_baseline_per_neuron, pca_bins, pca_coeff, PCA_comp);
+		test_set_as_rows = create_data_for_SVM(test_set,neurons,algo,feature_selection, start_bin, end_bin,mean_baseline_per_neuron,std_baseline_per_neuron, pca_bins, pca_coeff, PCA_comp);
+		%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		
+		ecoc_model = fitcecoc(training_set_as_rows,training_labels);
+		total_test_samples = size(test_set_as_rows,1);
+		successes = 0;
+		label_output_classifier = predict(ecoc_model,test_set_as_rows); 
+		for j = 1:size(test_set_as_rows,1)%changed
+			if(label_output_classifier{j,1} == test_labels{j,1})%changed
+				successes = successes + 1;
+			end
+		end
+		accuracy_per_trial_choosen(possible) = successes/total_test_samples;
+	end
+
+	algo_accuracy_dist = fitdist(accuracy_per_trial_choosen, 'Normal');
+	fprintf("The accuracy of the model is: %.2f\n", algo_accuracy_dist.mean);
+	fprintf("The std is %.2f\n", algo_accuracy_dist.sigma);
+	
+	accuracy_per__pca_components_taken(PCA_comp, 1) = algo_accuracy_dist.mean;
+	accuracy_per__pca_components_taken(PCA_comp, 2) = algo_accuracy_dist.sigma;
 end
-
-algo_accuracy_dist = fitdist(accuracy_per_trial_choosen, 'Normal');
-fprintf("The accuracy of the model is: %.2f\n", algo_accuracy_dist.mean);
-fprintf("The std is %.2f\n", algo_accuracy_dist.sigma);
-
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function set_as_rows = create_data_for_SVM(set,neurons,algo,feature_selection, start_bin, end_bin,mean_baseline_per_neuron,std_baseline_per_neuron, pca_bins, pca_coeff, num_pca_components)
