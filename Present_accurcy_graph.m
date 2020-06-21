@@ -1,75 +1,85 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %This code is in charge to generate a graph to represent accurcy as a
-%sunction of number of neurons
+%sunction of number of neurons used in decoding.
 results_neurons = load("results_per_number_neurons");
 results_ssesion = load("results_per_ssesion");
-
-ssesion_num = size(results_ssesion.results,1);
-colums_num_ssesion = size(results_ssesion.results,2);
-M = size(results_neurons.results,1);
-colums_num_neurons = size(results_neurons.results,2);
-
-neurons_num_neuron = 1:M;
-ssesions_vec = 1:ssesion_num;
-
-mean_accuracy_ssesion = results_ssesion.results(:,colums_num_ssesion,1);
-mean_std_accuracy_ssesion = results_ssesion.results(:,colums_num_ssesion,2);
-mean_accuracy = transpose(results_neurons.results(:,colums_num_neurons,1));
-mean_std_accurcy = transpose(results_neurons.results(:,colums_num_neurons,2));
-
-present_std_jumps = 10;
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%choose chance level and statistic demand for ttest
+chance_level = 0.2;%NOT IN PERCENT the plot_accurcy_graph will convert it to percent
+stat_demand = 0.05;%NOT IN PERCENT the plot_accurcy_graph will assume this value is not in percent
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%present error std in these jumps:
+present_error_jumps_neurons = 10;
 present_ssesion_std_jump = 1;
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% PART1: neurons graph %%%%%%%%%%%%%%%%%%%
-figure;
-plot(neurons_num_neuron,mean_accuracy,'LineWidth',3);
-hold on;
-for i=1:present_std_jumps:M
-    plot_std_line(neurons_num_neuron(i),mean_accuracy(i),mean_std_accurcy(i),2);
-    hold on
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%present asterik(*) in these locations if needed:
+neurons_asterik_diff = [-2,1];
+session_asterik_diff = [-0.1,1];
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+neurons_labels = "Neurons number";
+session_labels = "Session number";
+plot_accuracy_graph(results_neurons.results,chance_level,stat_demand,5,2,neurons_asterik_diff,present_error_jumps_neurons,neurons_labels)
+plot_accuracy_graph(results_ssesion.results,chance_level,stat_demand,1,0.1,session_asterik_diff,present_ssesion_std_jump,session_labels)
+
+function plot_accuracy_graph(results,chance_level,stat_demand,start_std,dash_length,asterik_diff,present_error_jumps,label)
+    accuracy = results(:,:,1);
+    samples_per_condition = size(results,2) - 1;
+    num_of_conditions = size(results,1);
+    error_per_condition = zeros(num_of_conditions,1);
+    %if all conditions are met then only one sample can be done, so std is
+    %only on one value meaning it's zero. therefore calculate only for
+    %times when not all condition are met
+    %calculate std error - not std!
+    error_per_condition((1:(num_of_conditions-1)),1) = sqrt(1/samples_per_condition) * std(100*accuracy(1:(num_of_conditions-1),1:samples_per_condition),0,2);
+    figure;
+    mean_accuracy = 100*accuracy(:,samples_per_condition+1);
+    p1 = plot((1:num_of_conditions)',mean_accuracy,'LineWidth',1.5,'DisplayName','Accurcy');
+    hold on;
+    for i=start_std:present_error_jumps:num_of_conditions
+        plot_std_error_line(i,mean_accuracy(i),error_per_condition(i),dash_length);
+        hold on;
+        Isdiffer = check_ttest1_for_per_neuron_count(accuracy(i,1:samples_per_condition),chance_level,stat_demand);
+        if(Isdiffer)%if the accuracy array is significantly bigger than chance level mark with asterik
+            scatter(i + asterik_diff(1),mean_accuracy(i)+error_per_condition(i)+asterik_diff(2),'r*');
+            hold on
+        end
+    end
+    p2 = plot(1:num_of_conditions,ones(1,num_of_conditions)*100*chance_level,'--','Color',[0.8500 0.3250 0.0980],'DisplayName','Chance Level');
+    legend([p1,p2]);
+    legend('boxoff');
+    legend('Location','southeast');
+    grid on;
+    xlabel(label);
+    ylabel("Accuracy[%]");
+    axis([0,num_of_conditions + 5,0,100]);
+    axis 'auto x';
+    title("Accuracy as func. of " + label);
+    saveas(gcf,"Accurcy as function of " + label + ".jpg");
+
+    figure;
+    plot((1:num_of_conditions)',error_per_condition,'LineWidth',1.5);
+    grid on;
+    xlabel(label);
+    ylabel("standard error[%]");
+    legend("standard error");
+    title("Std error of Accuracy as func. of " + label)
+    saveas(gcf,"std error of decoder as function of " + label+".jpg");
 end
-grid on;
-xlabel("Neurons number");
-ylabel("Accuracy");
-title("Accuracy of decoder as function of neurons number in the decoding process");
-saveas(gcf,"Accurcy as function of neuron num.jpg");
 
-figure;
-plot(neurons_num_neuron,mean_std_accurcy,'LineWidth',3);
-grid on;
-xlabel("Neurons number");
-ylabel("\sigma(standard deviation)");
-title("\sigma of decoder as function of neurons number in the decoding process");
-saveas(gcf,"std of decoder as function of neuron num.jpg");
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% PART2 SSESION graphs %%%%%%%%%%%%%%%%%%%
-figure;
-plot(ssesions_vec,mean_accuracy_ssesion,'LineWidth',3);
-hold on;
-for i=1:present_ssesion_std_jump:ssesion_num
-    plot_std_line(ssesions_vec(i),mean_accuracy_ssesion(i),mean_std_accuracy_ssesion(i),0.2);
-    hold on
-end
-grid on;
-xlabel("Sessions number");
-ylabel("Accuracy");
-title("Accuracy of decoder as function of Sessions number used in the decoding process");
-saveas(gcf,"accuracy of decoder as function of sessions num.jpg");
-
-
-figure;
-plot(ssesions_vec,mean_std_accuracy_ssesion,'LineWidth',3);
-grid on;
-xlabel("Neurons number");
-ylabel("\sigma(standard deviation)");
-title("\sigma of decoder as function of sessions number in the decoding process");
-saveas(gcf,"std of decoder as function of sessions num.jpg");
-
-
-function plot_std_line(x,y,std_value,dash_length)
-    up_thers = y + std_value;
-    down_thres = y - std_value;
+function plot_std_error_line(x,y,error_value,dash_length)
+    up_thers = y + error_value;
+    down_thres = y - error_value;
     plot([x,x],[down_thres,up_thers],'m');
     hold on;
     plot([x - dash_length,x + dash_length],[down_thres,down_thres],'m');
     hold on;
     plot([x - dash_length,x + dash_length],[up_thers,up_thers],'m');
+end
+%This function gets an array with a specified samples of accuracy of
+%decoders and return 1 if it's mean is statisically large than chance_level
+%specified. meaning it is unlikely to be distributed under mean of chance level.
+% the p-value has to be lower than stat_demand
+function Isdiffer = check_ttest1_for_per_neuron_count(sample_means,chance_level,stat_demand)
+    [h,p] = ttest(sample_means,chance_level,'Tail', 'right');
+    Isdiffer = p<stat_demand;
 end
