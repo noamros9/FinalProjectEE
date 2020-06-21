@@ -25,6 +25,16 @@ session_labels = "Session number";
 plot_accuracy_graph(results_neurons.results,chance_level,stat_demand,5,2,neurons_asterik_diff,present_error_jumps_neurons,neurons_labels)
 plot_accuracy_graph(results_ssesion.results,chance_level,stat_demand,1,0.1,session_asterik_diff,present_ssesion_std_jump,session_labels)
 
+figure();
+results_pca = load("accuracy_per_PCA_components_taken.mat");
+scatter(1:20,100*results_pca.accuracy_per__pca_components_taken(:,1)',"filled")
+xlabel("Num of components")
+ylabel("Accuracy[%]")
+title("Accuracy as a function of PCA components")
+grid on;
+axis([0,21,0,100]);
+saveas(gcf,"Accurcy as function of " + "PCA components" + ".jpg");
+
 function plot_accuracy_graph(results,chance_level,stat_demand,start_std,dash_length,asterik_diff,present_error_jumps,label)
     accuracy = results(:,:,1);
     samples_per_condition = size(results,2) - 1;
