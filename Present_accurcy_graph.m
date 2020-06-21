@@ -1,6 +1,10 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %This code is in charge to generate a graph to represent accurcy as a
-%sunction of number of neurons used in decoding.
+%function of number of neurons used in decoding.
+%The code does contain some assumption on our data
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
 results_neurons = load("results_per_number_neurons");
 results_ssesion = load("results_per_ssesion");
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -36,9 +40,14 @@ function plot_accuracy_graph(results,chance_level,stat_demand,start_std,dash_len
     p1 = plot((1:num_of_conditions)',mean_accuracy,'LineWidth',1.5,'DisplayName','Accurcy');
     hold on;
     for i=start_std:present_error_jumps:num_of_conditions
+        if (i==num_of_conditions)
+            samples_occurances = 1;
+        else
+            samples_occurances = samples_per_condition;
+        end
         plot_std_error_line(i,mean_accuracy(i),error_per_condition(i),dash_length);
         hold on;
-        Isdiffer = check_ttest1_for_per_neuron_count(accuracy(i,1:samples_per_condition),chance_level,stat_demand);
+        Isdiffer = check_ttest1_for_per_neuron_count(accuracy(i,1:samples_occurances),chance_level,stat_demand);
         if(Isdiffer)%if the accuracy array is significantly bigger than chance level mark with asterik
             scatter(i + asterik_diff(1),mean_accuracy(i)+error_per_condition(i)+asterik_diff(2),'r*');
             hold on
