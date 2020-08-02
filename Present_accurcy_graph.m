@@ -3,12 +3,23 @@
 %function of number of neurons used in decoding.
 %The code does contain some assumption on our data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-results_pca = load("accuracyPerPComp.mat");
+
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Changable values %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 results_neurons = load("resultsNeuronsSpeech.mat");
-results_ssesion = load("resultsSession.mat");
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %choose chance level and statistic demand for ttest
-titles = "Speech targets";
+titles = "Speech Targets";
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+
 chance_level = 0.2;%NOT IN PERCENT the plot_accurcy_graph will convert it to percent
 stat_demand = 0.05;%NOT IN PERCENT the plot_accurcy_graph will assume this value is not in percent
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -21,34 +32,8 @@ neurons_asterik_diff = [-2,1];
 session_asterik_diff = [-0.1,1];
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 neurons_labels = "Neurons number";
-session_labels = "Session number";
 plot_accuracy_graph(results_neurons.results,chance_level,stat_demand,5,2,neurons_asterik_diff,present_error_jumps_neurons,neurons_labels," - " + titles)
-plot_accuracy_graph(results_ssesion.results,chance_level,stat_demand,1,0.1,session_asterik_diff,present_ssesion_std_jump,session_labels," - " + "Speech targets")
 
-figure();
-accuracy_PCA_Comp = 100*results_pca.accuracy_per__pca_components_taken;
-mean_accuracy_PCA_comp = mean(accuracy_PCA_Comp, 2);
-samples_to_pca_comp = size(accuracy_PCA_Comp,2);
-%calculate std error - not std!
-std_error_per_pca = sqrt(1/samples_to_pca_comp) * std(accuracy_PCA_Comp, 0, 2); 
-comps = 1:20;
-scatter(comps,mean_accuracy_PCA_comp',"filled")
-hold on;
-for comp = comps
-    plot_std_error_line(comp,mean_accuracy_PCA_comp(comp),std_error_per_pca(comp),0.3)
-    hold on;
-    isDiffer = check_ttest1_for_mean(accuracy_PCA_Comp(comp,:),chance_level,stat_demand);
-    if isDiffer
-        scatter(comp - 0.3,mean_accuracy_PCA_comp(comp)+std_error_per_pca(comp)+1,'r*');
-        hold on
-    end
-end
-xlabel("Num of components")
-ylabel("Accuracy [%]")
-title("Accuracy as a function of PCA components")
-grid on;
-axis([0,21,0,102]);
-saveas(gcf,"Accurcy as function of " + "PCA components" + ".jpg");
 
 function plot_accuracy_graph(results,chance_level,stat_demand,start_std,dash_length,asterik_diff,present_error_jumps,label,titles)
     accuracy = results(:,:,1);

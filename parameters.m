@@ -2,6 +2,12 @@
 %for the different kinds of algorithms we may want 
 %to run
 
+%%%%%%%%%%%%%%%%%%%%%%%%%% Section 1 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%\
+%Determine the action need to be decoded:
+starter = ""; %can be only im- for imagine, au- for audio, and "" for Speech
+%Determin the percent of data that will be used for training.
+training_precent_from_data = 0.75;
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %feature selection:
 % 1.max_bin = choose the bin with the max frequency
@@ -30,6 +36,9 @@ pca_bins = 11:30;
 num_pca_components = 1;
 
 
+%%%%%%%%%%%%%%%%%%%%%%%%%% Section 1 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%%%%%%%%%%% Section 2 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 switch algo
 	case 'standard'
 		switch feature_selection
@@ -62,5 +71,6 @@ switch algo
 		start_bin = 13;
 		end_bin = 17;
 end
+%%%%%%%%%%%%%%%%%%%%%%%%%% Section 1 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 save parameters.mat;
 
