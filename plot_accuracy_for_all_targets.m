@@ -1,12 +1,4 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%This code is in charge to generate a graph to represent accurcy as a
-%function of number of neurons used in decoding.
-%The code does contain some assumption on our data
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-results_pca = load("accuracyPerPComp.mat");
-results_neurons = load("resultsNeuronsSpeech.mat");
-results_ssesion = load("resultsSession.mat");
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %choose chance level and statistic demand for ttest
 titles = "Speech targets";
 chance_level = 0.2;%NOT IN PERCENT the plot_accurcy_graph will convert it to percent
@@ -21,36 +13,25 @@ neurons_asterik_diff = [-2,1];
 session_asterik_diff = [-0.1,1];
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 neurons_labels = "Neurons number";
-session_labels = "Session number";
-plot_accuracy_graph(results_neurons.results,chance_level,stat_demand,5,2,neurons_asterik_diff,present_error_jumps_neurons,neurons_labels," - " + titles)
-plot_accuracy_graph(results_ssesion.results,chance_level,stat_demand,1,0.1,session_asterik_diff,present_ssesion_std_jump,session_labels," - " + "Speech targets")
-
-figure();
-accuracy_PCA_Comp = 100*results_pca.accuracy_per__pca_components_taken;
-mean_accuracy_PCA_comp = mean(accuracy_PCA_Comp, 2);
-samples_to_pca_comp = size(accuracy_PCA_Comp,2);
-%calculate std error - not std!
-std_error_per_pca = sqrt(1/samples_to_pca_comp) * std(accuracy_PCA_Comp, 0, 2); 
-comps = 1:20;
-scatter(comps,mean_accuracy_PCA_comp',"filled")
-hold on;
-for comp = comps
-    plot_std_error_line(comp,mean_accuracy_PCA_comp(comp),std_error_per_pca(comp),0.3)
-    hold on;
-    isDiffer = check_ttest1_for_mean(accuracy_PCA_Comp(comp,:),chance_level,stat_demand);
-    if isDiffer
-        scatter(comp - 0.3,mean_accuracy_PCA_comp(comp)+std_error_per_pca(comp)+1,'r*');
-        hold on
-    end
-end
-xlabel("Num of components")
-ylabel("Accuracy [%]")
-title("Accuracy as a function of PCA components")
+results_neurons = load("resultsNeuronsSpeech.mat");
+pSpeech = plot_accuracy_graph(results_neurons.results,chance_level,stat_demand,5,2,neurons_asterik_diff,present_error_jumps_neurons,'c','Speech targets Accuracy');
+results_neurons = load("resultsNeuronsAuditory.mat");
+pAudio = plot_accuracy_graph(results_neurons.results,chance_level,stat_demand,5,2,neurons_asterik_diff,present_error_jumps_neurons,'r','Audiotory targets Accuracy');
+results_neurons = load("resultsNeuronsImaginary.mat");
+pImagine = plot_accuracy_graph(results_neurons.results,chance_level,stat_demand,5,2,neurons_asterik_diff,present_error_jumps_neurons,[0.4940 0.1840 0.5560],'Imaginary targets Accuracy');
+p4 = plot(1:123,ones(1,123)*100*chance_level,'--','Color',[0.8500 0.3250 0.0980],'DisplayName','Chance Level');
+legend([pSpeech,pAudio,pImagine,p4]);
+legend('boxoff');
+legend('Location','southeast');
 grid on;
-axis([0,21,0,102]);
-saveas(gcf,"Accurcy as function of " + "PCA components" + ".jpg");
+xlabel(neurons_labels);
+ylabel("Accuracy [%]");
+axis([0,123 + 5,0,100]);
+axis 'auto x';
+title("Mean accuracy for different targets");
+saveas(gcf,"Accurcy as function of neurons number for different targets" + ".jpg");
 
-function plot_accuracy_graph(results,chance_level,stat_demand,start_std,dash_length,asterik_diff,present_error_jumps,label,titles)
+function plotted_line = plot_accuracy_graph(results,chance_level,stat_demand,start_std,dash_length,asterik_diff,present_error_jumps,color_line,legend_name)
     accuracy = results(:,:,1);
     samples_per_condition = size(results,2) - 1;
     num_of_conditions = size(results,1);
@@ -60,9 +41,8 @@ function plot_accuracy_graph(results,chance_level,stat_demand,start_std,dash_len
     %times when not all condition are met
     %calculate std error - not std!
     error_per_condition((1:(num_of_conditions-1)),1) = sqrt(1/samples_per_condition) * std(100*accuracy(1:(num_of_conditions-1),1:samples_per_condition),0,2);
-    figure;
     mean_accuracy = 100*accuracy(:,samples_per_condition+1);
-    p1 = plot((1:num_of_conditions)',mean_accuracy,'LineWidth',1.5,'DisplayName','Accurcy');
+    plotted_line = plot((1:num_of_conditions)',mean_accuracy,'LineWidth',1.5,'DisplayName',legend_name,'Color',color_line);
     hold on;
     for i=start_std:present_error_jumps:num_of_conditions
         if (i==num_of_conditions)
@@ -78,26 +58,6 @@ function plot_accuracy_graph(results,chance_level,stat_demand,start_std,dash_len
             hold on
         end
     end
-    p2 = plot(1:num_of_conditions,ones(1,num_of_conditions)*100*chance_level,'--','Color',[0.8500 0.3250 0.0980],'DisplayName','Chance Level');
-    legend([p1,p2]);
-    legend('boxoff');
-    legend('Location','southeast');
-    grid on;
-    xlabel(label);
-    ylabel("Accuracy [%]");
-    axis([0,num_of_conditions + 5,0,100]);
-    axis 'auto x';
-    title("Accuracy as func. of " + label + titles);
-    saveas(gcf,"Accurcy as function of " + label + titles + ".jpg");
-
-    figure;
-    plot((1:num_of_conditions)',error_per_condition,'LineWidth',1.5);
-    grid on;
-    xlabel(label);
-    ylabel("standard error [%]");
-    legend("standard error");
-    title("Std error of Accuracy as func. of " + label + titles)
-    saveas(gcf,"std error of decoder as function of " + label+ titles +".jpg");
 end
 
 function plot_std_error_line(x,y,error_value,dash_length)
